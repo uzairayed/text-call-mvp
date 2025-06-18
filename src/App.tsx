@@ -5,7 +5,6 @@ import AuthScreen from './AuthScreen'
 import UsernameScreen from './UsernameScreen'
 import HomeScreen from './HomeScreen'
 import StartCallScreen from './StartCallScreen'
-import IncomingCallScreen from './IncomingCallScreen'
 import LiveSessionScreen from './LiveSessionScreen'
 import SummaryScreen from './SummaryScreen'
 import { doc, getDoc } from 'firebase/firestore'
@@ -47,7 +46,6 @@ function App() {
     <>
       {screen === 'home' && <HomeScreen onNavigate={handleNavigate} />}
       {screen === 'startCall' && <StartCallScreen onNavigate={handleNavigate} />}
-      {screen === 'calling' && <IncomingCallScreen onNavigate={handleNavigate} />}
       {screen === 'liveSession' && recipient && sessionId && (
         <LiveSessionScreen onNavigate={handleNavigate} recipient={recipient} sessionId={sessionId} />
       )}
