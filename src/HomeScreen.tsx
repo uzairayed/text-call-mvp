@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useSessions } from "./SessionContext";
 import { auth, db } from "./firebase";
 import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 import IncomingCallScreen from "./IncomingCallScreen";
 
 type Props = {
@@ -41,6 +42,14 @@ const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
     return () => unsubscribe();
   }, [myUsername]);
 
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
   if (incomingCall) {
     return (
       <IncomingCallScreen
@@ -58,11 +67,11 @@ const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-10 bg-[#FAFAFA] border-b border-gray-100 flex items-center justify-between px-6 py-4 shadow-sm">
+      <header className="sticky top-0 z-10 bg-white border-b border-gray-100 flex items-center justify-between px-6 py-4 shadow-sm">
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-extrabold tracking-tight" style={{ color: '#E74C3C', fontFamily: 'Inter, system-ui, sans-serif' }}>TextCall</span>
+          <span className="text-2xl font-extrabold tracking-tight text-[#E74C3C]" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>TextCall</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <span className="text-gray-500 font-medium text-sm">Status:</span>
           <button
             className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold shadow transition border focus:outline-none focus:ring-2 focus:ring-primary/40 ${status === 'online' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}
@@ -70,6 +79,12 @@ const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
           >
             <span className={`h-2 w-2 rounded-full ${status === 'online' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
             {status.charAt(0).toUpperCase() + status.slice(1)}
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="text-sm text-gray-600 hover:text-red-500 transition-colors"
+          >
+            Sign Out
           </button>
         </div>
       </header>
@@ -80,7 +95,7 @@ const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
           {/* Start Call Card */}
           <div className="bg-white rounded-2xl shadow-lg p-8 flex flex-col items-center gap-6">
             <button
-              className="w-full bg-primary text-white rounded-xl px-6 py-3 text-lg font-semibold shadow hover:bg-red-600 transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="w-full bg-[#E74C3C] text-white rounded-xl px-6 py-3 text-lg font-semibold shadow hover:bg-red-600 transition focus:outline-none focus:ring-2 focus:ring-red-500/40"
               onClick={() => onNavigate("startCall")}
             >
               Start a Call
@@ -102,7 +117,7 @@ const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
                     <span className="font-semibold text-gray-900 text-base">{session.participant}</span>
                     <span className="text-xs text-gray-500">{session.time}</span>
                   </div>
-                  <button className="ml-4 text-primary text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 hover:bg-primary/20 transition">View</button>
+                  <button className="ml-4 text-[#E74C3C] text-xs font-semibold px-3 py-1 rounded-full bg-red-50 hover:bg-red-100 transition">View</button>
                 </div>
               ))}
               {sessions.length === 0 && (
