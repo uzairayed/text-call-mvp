@@ -8,7 +8,6 @@ import {
   onSnapshot,
   serverTimestamp,
 } from "firebase/firestore";
-import type { DocumentData } from "firebase/firestore";
 
 type Props = {
   onNavigate: (screen: string) => void;
