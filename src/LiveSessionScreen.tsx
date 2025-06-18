@@ -1,41 +1,75 @@
 import React, { useState, useEffect, useRef } from "react";
+import { db } from "./firebase";
+import {
+  collection,
+  addDoc,
+  query,
+  orderBy,
+  onSnapshot,
+  serverTimestamp,
+} from "firebase/firestore";
+import type { DocumentData } from "firebase/firestore";
 
 type Props = {
   onNavigate: (screen: string) => void;
 };
 
 const PARTICIPANT = "Alice";
+const SESSION_ID = "test-session-1"; // Replace with real session ID in production
 
-const mockMessages = [
-  { id: 1, sender: "me", text: "Hey! Ready for our text call?" },
-  { id: 2, sender: "Alice", text: "Yes! This is cool." },
-];
+interface Message {
+  id: string;
+  sender: string;
+  text: string;
+  createdAt: any;
+}
 
 const LiveSessionScreen: React.FC<Props> = ({ onNavigate }) => {
-  const [messages, setMessages] = useState(mockMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Subscribe to Firestore messages
   useEffect(() => {
-    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
-    return () => clearInterval(timer);
+    const q = query(
+      collection(db, "sessions", SESSION_ID, "messages"),
+      orderBy("createdAt", "asc")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setMessages(
+        snapshot.docs.map((doc) => {
+          const data = doc.data() as Message;
+          return { ...data, id: doc.id };
+        })
+      );
+    });
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Simulate other user typing
+  useEffect(() => {
+    const timer = setInterval(() => setSeconds((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Simulate other user typing (for demo)
   useEffect(() => {
     if (input) setTyping(true);
     else setTyping(false);
   }, [input]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
-    setMessages([...messages, { id: messages.length + 1, sender: "me", text: input }]);
+    await addDoc(collection(db, "sessions", SESSION_ID, "messages"), {
+      sender: "me",
+      text: input,
+      createdAt: serverTimestamp(),
+    });
     setInput("");
   };
 
