@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import {
   collection,
   addDoc,
@@ -7,15 +7,16 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
+  doc,
+  getDoc,
+  updateDoc,
 } from "firebase/firestore";
-import 'firebaseui/dist/firebaseui.css';
 
-type Props = {
-  onNavigate: (screen: string) => void;
-};
-
-const PARTICIPANT = "Alice";
-const SESSION_ID = "test-session-1"; // Replace with real session ID in production
+interface Props {
+  onNavigate: (screen: string, recipient?: string, sessionId?: string) => void;
+  recipient: string;
+  sessionId: string;
+}
 
 interface Message {
   id: string;
@@ -24,17 +25,31 @@ interface Message {
   createdAt: any;
 }
 
-const LiveSessionScreen: React.FC<Props> = ({ onNavigate }) => {
+const LiveSessionScreen: React.FC<Props> = ({ onNavigate, recipient, sessionId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [typing, setTyping] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [myUsername, setMyUsername] = useState<string>("");
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Get current user's username
+  useEffect(() => {
+    const fetchUsername = async () => {
+      const user = auth.currentUser;
+      if (user) {
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        setMyUsername(userDoc.data()?.username || "");
+      }
+    };
+    fetchUsername();
+  }, []);
 
   // Subscribe to Firestore messages
   useEffect(() => {
+    if (!myUsername || !sessionId) return;
     const q = query(
-      collection(db, "sessions", SESSION_ID, "messages"),
+      collection(db, "sessions", sessionId, "messages"),
       orderBy("createdAt", "asc")
     );
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -46,7 +61,20 @@ const LiveSessionScreen: React.FC<Props> = ({ onNavigate }) => {
       );
     });
     return () => unsubscribe();
-  }, []);
+  }, [myUsername, recipient, sessionId]);
+
+  // Listen for call status changes
+  useEffect(() => {
+    if (!sessionId) return;
+    const callDocRef = doc(db, "calls", sessionId);
+    const unsubscribe = onSnapshot(callDocRef, (docSnap) => {
+      const data = docSnap.data();
+      if (data && data.status === "ended") {
+        onNavigate("home");
+      }
+    });
+    return () => unsubscribe();
+  }, [sessionId, onNavigate]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -64,13 +92,18 @@ const LiveSessionScreen: React.FC<Props> = ({ onNavigate }) => {
   }, [input]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
-    await addDoc(collection(db, "sessions", SESSION_ID, "messages"), {
-      sender: "me",
+    if (!input.trim() || !sessionId || !myUsername) return;
+    await addDoc(collection(db, "sessions", sessionId, "messages"), {
+      sender: myUsername,
       text: input,
       createdAt: serverTimestamp(),
     });
     setInput("");
+  };
+
+  const handleEndCall = async () => {
+    await updateDoc(doc(db, "calls", sessionId), { status: "ended" });
+    onNavigate("home");
   };
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
@@ -82,11 +115,13 @@ const LiveSessionScreen: React.FC<Props> = ({ onNavigate }) => {
           {/* Top Bar */}
           <div className="flex items-center justify-between px-6 py-4 border-b bg-white/80 backdrop-blur-sm">
             <div className="text-xs font-semibold text-primary uppercase tracking-wider">In Session</div>
-            <div className="font-bold text-gray-900 text-base">{PARTICIPANT}</div>
+            <div className="font-bold text-gray-900 text-base">
+              You ({myUsername}) &rarr; {recipient}
+            </div>
             <div className="text-xs text-gray-400 font-mono tabular-nums">{formatTime(seconds)}</div>
             <button
               className="ml-2 bg-red-100 text-red-600 rounded-lg px-3 py-1 text-xs font-semibold hover:bg-red-200 transition focus:outline-none focus:ring-2 focus:ring-red-200"
-              onClick={() => onNavigate("summary")}
+              onClick={handleEndCall}
             >
               End
             </button>
@@ -96,7 +131,7 @@ const LiveSessionScreen: React.FC<Props> = ({ onNavigate }) => {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`max-w-[70%] rounded-2xl px-5 py-3 text-base shadow-sm ${msg.sender === "me" ? "ml-auto bg-primary text-white" : "mr-auto bg-gray-200 text-gray-900"}`}
+                className={`max-w-[70%] rounded-2xl px-5 py-3 text-base shadow-sm ${msg.sender === myUsername ? "ml-auto bg-primary text-white" : "mr-auto bg-gray-200 text-gray-900"}`}
                 style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
               >
                 {msg.text}
@@ -104,7 +139,7 @@ const LiveSessionScreen: React.FC<Props> = ({ onNavigate }) => {
             ))}
             {typing && (
               <div className="max-w-[70%] mr-auto bg-gray-200 text-gray-500 rounded-2xl px-5 py-3 text-base italic animate-pulse" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-                {PARTICIPANT} is typing…
+                {recipient} is typing…
               </div>
             )}
             <div ref={chatEndRef} />

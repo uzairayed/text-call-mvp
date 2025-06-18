@@ -1,13 +1,59 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSessions } from "./SessionContext";
+import { auth, db } from "./firebase";
+import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
+import IncomingCallScreen from "./IncomingCallScreen";
 
 type Props = {
-  onNavigate: (screen: string) => void;
+  onNavigate: (screen: string, recipient?: string, sessionId?: string) => void;
 };
 
 const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
   const [status, setStatus] = useState<'online' | 'busy'>('online');
   const { sessions, clearSessions } = useSessions();
+  const [incomingCall, setIncomingCall] = useState<null | { caller: string; sessionId: string }>(null);
+  const [myUsername, setMyUsername] = useState<string>("");
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+    (async () => {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      setMyUsername(userDoc.data()?.username || "");
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!myUsername) return;
+    const q = query(
+      collection(db, "calls"),
+      where("recipient", "==", myUsername),
+      where("status", "==", "ringing")
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const callDoc = snapshot.docs[0];
+        setIncomingCall({ caller: callDoc.data().caller, sessionId: callDoc.id });
+      } else {
+        setIncomingCall(null);
+      }
+    });
+    return () => unsubscribe();
+  }, [myUsername]);
+
+  if (incomingCall) {
+    return (
+      <IncomingCallScreen
+        caller={incomingCall.caller}
+        sessionId={incomingCall.sessionId}
+        onNavigate={(
+          screen: string,
+          recipient?: string,
+          sessionId?: string
+        ) => onNavigate(screen, recipient, sessionId)}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col">

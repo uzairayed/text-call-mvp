@@ -1,25 +1,22 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+import { db } from "./firebase";
+import { doc, updateDoc } from "firebase/firestore";
 
 type Props = {
-  onNavigate: (screen: string) => void;
+  caller: string;
+  sessionId: string;
+  onNavigate: (screen: string, recipient?: string, sessionId?: string) => void;
 };
 
-const CALLER_NAME = "Alice";
-const PURPOSE = "Quick project sync";
-const TIMEOUT = 10; // seconds
-
-const IncomingCallScreen: React.FC<Props> = ({ onNavigate }) => {
-  const [countdown, setCountdown] = useState(TIMEOUT);
-
-  useEffect(() => {
-    if (countdown <= 0) {
-      onNavigate("home");
-      return;
-    }
-    const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown, onNavigate]);
-
+const IncomingCallScreen: React.FC<Props> = ({ caller, sessionId, onNavigate }) => {
+  const handleAccept = async () => {
+    await updateDoc(doc(db, "calls", sessionId), { status: "active" });
+    onNavigate("liveSession", caller, sessionId);
+  };
+  const handleReject = async () => {
+    await updateDoc(doc(db, "calls", sessionId), { status: "ended" });
+    onNavigate("home");
+  };
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center px-4 py-8">
       <div className="w-full max-w-lg grid gap-8">
@@ -32,21 +29,18 @@ const IncomingCallScreen: React.FC<Props> = ({ onNavigate }) => {
             </div>
           </div>
           <h1 className="text-2xl font-extrabold text-primary tracking-tight mt-8 mb-2" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>Incoming Call</h1>
-          <div className="mb-1 text-lg font-semibold text-gray-900">{CALLER_NAME}</div>
-          {PURPOSE && (
-            <div className="mb-2 text-gray-500 italic text-center">{PURPOSE}</div>
-          )}
-          <div className="mb-4 text-xs text-gray-400">Auto-decline in {countdown}s</div>
+          <div className="mb-1 text-lg font-semibold text-gray-900">{caller}</div>
+          <div className="mb-4 text-xs text-gray-400">is calling you…</div>
           <div className="grid grid-cols-2 gap-4 w-full mt-2">
             <button
               className="bg-primary text-white rounded-xl px-6 py-3 text-lg font-semibold shadow hover:bg-red-600 transition focus:outline-none focus:ring-2 focus:ring-primary/40"
-              onClick={() => onNavigate("liveSession")}
+              onClick={handleAccept}
             >
               Accept
             </button>
             <button
               className="bg-gray-100 text-red-600 rounded-xl px-6 py-3 text-lg font-semibold shadow hover:bg-gray-200 transition focus:outline-none focus:ring-2 focus:ring-red-200"
-              onClick={() => onNavigate("home")}
+              onClick={handleReject}
             >
               Reject
             </button>

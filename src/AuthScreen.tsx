@@ -1,27 +1,37 @@
-import React from "react";
-import { StyledFirebaseAuth } from "react-firebaseui";
 import { auth } from "./firebase";
-import { GoogleAuthProvider, EmailAuthProvider } from "firebase/auth";
-import 'firebaseui/dist/firebaseui.css';
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { useState } from "react";
 
-const uiConfig = {
-  signInFlow: "popup",
-  signInOptions: [
-    GoogleAuthProvider.PROVIDER_ID,
-    EmailAuthProvider.PROVIDER_ID,
-  ],
-  callbacks: {
-    signInSuccessWithAuthResult: () => false,
-  },
-};
+const provider = new GoogleAuthProvider();
 
-const AuthScreen: React.FC = () => (
-  <div className="flex flex-col items-center justify-center min-h-screen bg-[#FAFAFA]">
-    <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
-      <h1 className="text-2xl font-bold mb-6 text-primary text-center">Sign In</h1>
-      <StyledFirebaseAuth uiConfig={uiConfig} firebaseAuth={auth} />
+const AuthScreen = () => {
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#FAFAFA]">
+      <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-6 text-primary text-center">Sign In</h1>
+        <button
+          className="w-full bg-primary text-white rounded-xl px-6 py-3 text-lg font-semibold shadow hover:bg-red-600 transition mb-4"
+          onClick={handleGoogleSignIn}
+        >
+          Continue with Google
+        </button>
+        {error && (
+          <div className="text-red-500 text-sm text-center mt-2">{error}</div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default AuthScreen; 
