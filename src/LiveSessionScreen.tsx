@@ -8,6 +8,7 @@ import {
   onSnapshot,
   serverTimestamp,
 } from "firebase/firestore";
+import 'firebaseui/dist/firebaseui.css';
 
 type Props = {
   onNavigate: (screen: string) => void;

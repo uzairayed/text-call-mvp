@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { useAuthState } from 'react-firebase-hooks/auth'
+import { auth } from './firebase'
+import AuthScreen from './AuthScreen'
 import HomeScreen from './HomeScreen'
 import StartCallScreen from './StartCallScreen'
 import IncomingCallScreen from './IncomingCallScreen'
@@ -7,11 +10,15 @@ import SummaryScreen from './SummaryScreen'
 import './App.css'
 
 function App() {
+  const [user, loading] = useAuthState(auth)
   const [screen, setScreen] = useState('home')
 
   const handleNavigate = (nextScreen: string) => {
     setScreen(nextScreen)
   }
+
+  if (loading) return <div>Loading...</div>
+  if (!user) return <AuthScreen />
 
   return (
     <>
