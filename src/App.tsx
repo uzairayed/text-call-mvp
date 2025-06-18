@@ -49,7 +49,9 @@ function App() {
       {screen === 'liveSession' && recipient && sessionId && (
         <LiveSessionScreen onNavigate={handleNavigate} recipient={recipient} sessionId={sessionId} />
       )}
-      {screen === 'summary' && <SummaryScreen onNavigate={handleNavigate} />}
+      {screen === 'summary' && sessionId && (
+        <SummaryScreen onNavigate={handleNavigate} sessionId={sessionId} />
+      )}
     </>
   )
 }

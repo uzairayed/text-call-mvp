@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { db } from "./firebase";
 import { doc, updateDoc } from "firebase/firestore";
+
+const RINGTONE_URL = "https://cdn.pixabay.com/audio/2022/07/26/audio_124bfa4c3b.mp3"; // Free ringtone
 
 type Props = {
   caller: string;
@@ -9,11 +11,27 @@ type Props = {
 };
 
 const IncomingCallScreen: React.FC<Props> = ({ caller, sessionId, onNavigate }) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Play ringtone on mount
+    audioRef.current = new Audio(RINGTONE_URL);
+    audioRef.current.loop = true;
+    audioRef.current.play();
+    return () => {
+      // Stop ringtone on unmount
+      audioRef.current?.pause();
+      audioRef.current = null;
+    };
+  }, []);
+
   const handleAccept = async () => {
+    audioRef.current?.pause();
     await updateDoc(doc(db, "calls", sessionId), { status: "active" });
     onNavigate("liveSession", caller, sessionId);
   };
   const handleReject = async () => {
+    audioRef.current?.pause();
     await updateDoc(doc(db, "calls", sessionId), { status: "ended" });
     onNavigate("home");
   };

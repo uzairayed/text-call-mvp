@@ -10,6 +10,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  getDocs,
 } from "firebase/firestore";
 
 interface Props {
@@ -102,8 +103,25 @@ const LiveSessionScreen: React.FC<Props> = ({ onNavigate, recipient, sessionId }
   };
 
   const handleEndCall = async () => {
-    await updateDoc(doc(db, "calls", sessionId), { status: "ended" });
-    onNavigate("home");
+    // Fetch all messages for this session
+    const messagesSnapshot = await getDocs(collection(db, "sessions", sessionId, "messages"));
+    const messages = messagesSnapshot.docs.map(doc => doc.data());
+    // Call the AI summary endpoint
+    let summary = "";
+    try {
+      const response = await fetch("/api/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages }),
+      });
+      const data = await response.json();
+      summary = data.summary;
+    } catch (err) {
+      summary = "AI summary could not be generated.";
+    }
+    // Save summary to Firestore (in calls collection)
+    await updateDoc(doc(db, "calls", sessionId), { status: "ended", summary });
+    onNavigate("summary", recipient, sessionId);
   };
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
