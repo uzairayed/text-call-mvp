@@ -12,7 +12,7 @@ type Props = {
 const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
   const [status, setStatus] = useState<'online' | 'busy'>('online');
   const { clearSessions } = useSessions();
-  const [incomingCall] = useState<null | { caller: string; sessionId: string }>(null);
+  const [incomingCall, setIncomingCall] = useState<null | { caller: string; sessionId: string }>(null);
   const [myUsername, setMyUsername] = useState<string>("");
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
 
@@ -24,6 +24,30 @@ const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
       setMyUsername(userDoc.data()?.username || "");
     })();
   }, []);
+
+  useEffect(() => {
+    if (!myUsername) return;
+
+    const q = query(
+      collection(db, "calls"),
+      where("recipient", "==", myUsername),
+      where("status", "==", "ringing")
+    );
+
+    const unsub = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const callDoc = snapshot.docs[0];
+        setIncomingCall({
+          caller: callDoc.data().caller,
+          sessionId: callDoc.id,
+        });
+      } else {
+        setIncomingCall(null);
+      }
+    });
+
+    return () => unsub();
+  }, [myUsername]);
 
   useEffect(() => {
     if (!myUsername) return;
