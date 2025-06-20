@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSessions } from "./SessionContext";
 import { auth, db } from "./firebase";
-import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, getDoc, orderBy, limit } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import IncomingCallScreen from "./IncomingCallScreen";
 
@@ -11,9 +11,10 @@ type Props = {
 
 const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
   const [status, setStatus] = useState<'online' | 'busy'>('online');
-  const { sessions, clearSessions } = useSessions();
+  const { clearSessions } = useSessions();
   const [incomingCall, setIncomingCall] = useState<null | { caller: string; sessionId: string }>(null);
   const [myUsername, setMyUsername] = useState<string>("");
+  const [recentSessions, setRecentSessions] = useState<any[]>([]);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -26,20 +27,56 @@ const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
 
   useEffect(() => {
     if (!myUsername) return;
-    const q = query(
+    // Listen for ended calls where user is caller
+    const q1 = query(
       collection(db, "calls"),
-      where("recipient", "==", myUsername),
-      where("status", "==", "ringing")
+      where("status", "==", "ended"),
+      where("caller", "==", myUsername)
     );
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        const callDoc = snapshot.docs[0];
-        setIncomingCall({ caller: callDoc.data().caller, sessionId: callDoc.id });
-      } else {
-        setIncomingCall(null);
-      }
+    // Listen for ended calls where user is recipient
+    const q2 = query(
+      collection(db, "calls"),
+      where("status", "==", "ended"),
+      where("recipient", "==", myUsername)
+    );
+    const unsub1 = onSnapshot(q1, (snapshot1) => {
+      const sessions1 = snapshot1.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          participant: data.recipient,
+          time: data.endedAt && data.endedAt.toDate ? data.endedAt.toDate().toLocaleString() : "-",
+          duration: data.duration ? `${Math.floor(data.duration / 60)}m ${data.duration % 60}s` : "-",
+          summary: data.summary || "",
+        };
+      });
+      // Merge with sessions2
+      setRecentSessions(prev => {
+        const sessions2 = prev.filter(s => s._source !== 'caller');
+        return [...sessions1.map(s => ({ ...s, _source: 'caller' })), ...sessions2].sort((a, b) => (b.time > a.time ? 1 : -1)).slice(0, 10);
+      });
     });
-    return () => unsubscribe();
+    const unsub2 = onSnapshot(q2, (snapshot2) => {
+      const sessions2 = snapshot2.docs.map(docSnap => {
+        const data = docSnap.data();
+        return {
+          id: docSnap.id,
+          participant: data.caller,
+          time: data.endedAt && data.endedAt.toDate ? data.endedAt.toDate().toLocaleString() : "-",
+          duration: data.duration ? `${Math.floor(data.duration / 60)}m ${data.duration % 60}s` : "-",
+          summary: data.summary || "",
+        };
+      });
+      // Merge with sessions1
+      setRecentSessions(prev => {
+        const sessions1 = prev.filter(s => s._source !== 'recipient');
+        return [...sessions1, ...sessions2.map(s => ({ ...s, _source: 'recipient' }))].sort((a, b) => (b.time > a.time ? 1 : -1)).slice(0, 10);
+      });
+    });
+    return () => {
+      unsub1();
+      unsub2();
+    };
   }, [myUsername]);
 
   const handleSignOut = async () => {
@@ -106,21 +143,26 @@ const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-800 tracking-tight">Recent Sessions</h2>
-              {sessions.length > 0 && (
+              {recentSessions.length > 0 && (
                 <button className="text-xs text-gray-400 hover:text-red-500 transition underline" onClick={clearSessions}>Clear All</button>
               )}
             </div>
             <div className="grid gap-3">
-              {sessions.map(session => (
+              {recentSessions.map(session => (
                 <div key={session.id} className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 shadow-sm hover:shadow-md transition cursor-pointer">
                   <div className="flex flex-col">
                     <span className="font-semibold text-gray-900 text-base">{session.participant}</span>
-                    <span className="text-xs text-gray-500">{session.time}</span>
+                    <span className="text-xs text-gray-500">{session.time} &bull; {session.duration}</span>
                   </div>
-                  <button className="ml-4 text-[#E74C3C] text-xs font-semibold px-3 py-1 rounded-full bg-red-50 hover:bg-red-100 transition">View</button>
+                  <button
+                    className="ml-4 text-[#E74C3C] text-xs font-semibold px-3 py-1 rounded-full bg-red-50 hover:bg-red-100 transition"
+                    onClick={() => onNavigate("summary", session.participant, session.id)}
+                  >
+                    View
+                  </button>
                 </div>
               ))}
-              {sessions.length === 0 && (
+              {recentSessions.length === 0 && (
                 <div className="text-gray-400 text-center py-6">No recent sessions</div>
               )}
             </div>

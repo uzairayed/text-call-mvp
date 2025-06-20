@@ -119,8 +119,25 @@ const LiveSessionScreen: React.FC<Props> = ({ onNavigate, recipient, sessionId }
     } catch (err) {
       summary = "AI summary could not be generated.";
     }
-    // Save summary to Firestore (in calls collection)
-    await updateDoc(doc(db, "calls", sessionId), { status: "ended", summary });
+    // Save summary, endedAt, and duration to Firestore (in calls collection)
+    const endedAt = new Date();
+    // Fetch startedAt from Firestore
+    const callDoc = await getDoc(doc(db, "calls", sessionId));
+    let startedAt = null;
+    if (callDoc.exists()) {
+      const data = callDoc.data();
+      startedAt = data.startedAt && data.startedAt.toDate ? data.startedAt.toDate() : new Date(data.startedAt);
+    }
+    let duration = 0;
+    if (startedAt) {
+      duration = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
+    }
+    await updateDoc(doc(db, "calls", sessionId), {
+      status: "ended",
+      summary,
+      endedAt,
+      duration
+    });
     onNavigate("summary", recipient, sessionId);
   };
 
