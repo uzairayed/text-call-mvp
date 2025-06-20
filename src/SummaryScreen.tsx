@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useSessions } from "./SessionContext";
 import type { Session } from "./SessionContext";
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import { doc, getDoc, Timestamp } from "firebase/firestore";
 
 type Props = {
@@ -22,28 +22,38 @@ const SummaryScreen: React.FC<Props> = ({ onNavigate, sessionId }) => {
       setLoading(true);
       const callDoc = await getDoc(doc(db, "calls", sessionId));
       const data = callDoc.data();
+
+      const user = auth.currentUser;
+      if (!user) { setLoading(false); return; }
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const myUsername = userDoc.data()?.username;
+
       if (data) {
+        const otherParticipant = data.caller === myUsername ? data.recipient : data.caller;
         setSummary(data.summary || "No summary available.");
-        setParticipants(`You, ${data.caller === data.recipient ? data.caller : data.caller + ', ' + data.recipient}`);
-        // Calculate duration
+        setParticipants(`You and ${otherParticipant}`);
+        
+        let calculatedDuration = "-";
         if (data.startedAt && data.endedAt) {
           const start = (data.startedAt instanceof Timestamp) ? data.startedAt.toDate() : new Date(data.startedAt);
           const end = (data.endedAt instanceof Timestamp) ? data.endedAt.toDate() : new Date(data.endedAt);
           const diff = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
           const min = Math.floor(diff / 60);
           const sec = diff % 60;
-          setDuration(`${min}m ${sec}s`);
+          calculatedDuration = `${min}m ${sec}s`;
+          setDuration(calculatedDuration);
         } else {
-          setDuration("-");
+          setDuration(calculatedDuration);
         }
+        
         setDate(data.startedAt ? (data.startedAt instanceof Timestamp ? data.startedAt.toDate().toLocaleDateString() : new Date(data.startedAt).toLocaleDateString()) : "-");
-        // Add to local session history
+        
         const session: Session = {
           id: sessionId,
-          participant: data.caller === data.recipient ? data.caller : data.caller + ', ' + data.recipient,
+          participant: otherParticipant,
           time: data.startedAt ? (data.startedAt instanceof Timestamp ? data.startedAt.toDate().toLocaleString() : new Date(data.startedAt).toLocaleString()) : "-",
           summary: data.summary,
-          duration: duration,
+          duration: calculatedDuration,
           purpose: data.purpose || "Call session",
         };
         addSession(session);
@@ -52,7 +62,7 @@ const SummaryScreen: React.FC<Props> = ({ onNavigate, sessionId }) => {
     };
     fetchSessionData();
     // eslint-disable-next-line
-  }, [sessionId]);
+  }, [sessionId, addSession]);
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center px-4 py-8">
