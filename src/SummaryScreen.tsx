@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useSessions } from "./SessionContext";
 import type { Session } from "./SessionContext";
 import { db, auth } from "./firebase";
-import { doc, getDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, Timestamp, onSnapshot } from "firebase/firestore";
 
 type Props = {
   onNavigate: (screen: string, recipient?: string, sessionId?: string) => void;
@@ -18,17 +18,15 @@ const SummaryScreen: React.FC<Props> = ({ onNavigate, sessionId }) => {
   const [date, setDate] = useState<string>("");
 
   useEffect(() => {
-    const fetchSessionData = async () => {
-      setLoading(true);
-      const callDoc = await getDoc(doc(db, "calls", sessionId));
+    setLoading(true);
+    const unsub = onSnapshot(doc(db, "calls", sessionId), async (callDoc) => {
       const data = callDoc.data();
-
-      const user = auth.currentUser;
-      if (!user) { setLoading(false); return; }
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const myUsername = userDoc.data()?.username;
-
       if (data) {
+        const user = auth.currentUser;
+        if (!user) { setLoading(false); return; }
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        const myUsername = userDoc.data()?.username;
+        
         const otherParticipant = data.caller === myUsername ? data.recipient : data.caller;
         setSummary(data.summary || "No summary available.");
         setParticipants(`You and ${otherParticipant}`);
@@ -57,10 +55,17 @@ const SummaryScreen: React.FC<Props> = ({ onNavigate, sessionId }) => {
           purpose: data.purpose || "Call session",
         };
         addSession(session);
+        
+        // Stop loading if summary is present or if call has ended (even if summary failed)
+        if (data.summary || data.status === 'ended') {
+          setLoading(false);
+        }
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
-    };
-    fetchSessionData();
+    });
+
+    return () => unsub();
     // eslint-disable-next-line
   }, [sessionId, addSession]);
 
@@ -69,8 +74,12 @@ const SummaryScreen: React.FC<Props> = ({ onNavigate, sessionId }) => {
       <div className="w-full max-w-lg grid gap-8">
         <div className="bg-white rounded-2xl shadow-lg p-8 flex flex-col items-center gap-6">
           <h1 className="text-2xl font-extrabold text-primary tracking-tight mb-2" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>Session Summary</h1>
-          <div className="bg-gray-50 rounded-xl p-5 mb-2 w-full text-gray-700 text-base shadow-inner" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-            {loading ? "Generating summary..." : summary}
+          <div className="bg-gray-50 rounded-xl p-5 mb-2 w-full text-gray-700 text-base shadow-inner h-48 flex items-center justify-center" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+            {loading ? (
+              <span className="italic text-gray-500">Generating summary...</span>
+            ) : (
+              <p className="w-full h-full overflow-y-auto">{summary}</p>
+            )}
           </div>
           <div className="flex flex-col items-start w-full mb-2 text-sm text-gray-500 gap-1">
             <div><span className="font-semibold text-gray-700">Participants:</span> {participants}</div>
