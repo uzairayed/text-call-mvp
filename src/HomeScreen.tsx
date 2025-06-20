@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useSessions } from "./SessionContext";
 import { auth, db } from "./firebase";
-import { collection, query, where, onSnapshot, doc, getDoc, orderBy, limit } from "firebase/firestore";
+import { collection, query, where, onSnapshot, doc, getDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import IncomingCallScreen from "./IncomingCallScreen";
 
@@ -12,7 +12,7 @@ type Props = {
 const HomeScreen: React.FC<Props> = ({ onNavigate }) => {
   const [status, setStatus] = useState<'online' | 'busy'>('online');
   const { clearSessions } = useSessions();
-  const [incomingCall, setIncomingCall] = useState<null | { caller: string; sessionId: string }>(null);
+  const [incomingCall] = useState<null | { caller: string; sessionId: string }>(null);
   const [myUsername, setMyUsername] = useState<string>("");
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
 
